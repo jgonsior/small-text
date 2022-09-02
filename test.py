@@ -1,5 +1,7 @@
 """Example of a binary active learning text classification.
 """
+import json
+from pathlib import Path
 import random
 import numpy as np
 from sklearn.metrics import accuracy_score
@@ -8,6 +10,7 @@ import torch
 from small_text.active_learner import PoolBasedActiveLearner
 from small_text.classifiers import ConfidenceEnhancedLinearSVC
 from small_text.classifiers.factories import SklearnClassifierFactory
+from small_text.initialization.strategies import random_initialization_stratified
 from small_text.query_strategies import PoolExhaustedException, EmptyPoolException
 from small_text.query_strategies import RandomSampling
 from timeit import default_timer as timer
@@ -15,7 +18,6 @@ from timeit import default_timer as timer
 
 from small_text.active_learner import PoolBasedActiveLearner
 
-from small_text.initialization import random_initialization_balanced
 from small_text.integrations.transformers import TransformerModelArguments
 from small_text.integrations.transformers.classifiers.factories import (
     TransformerBasedClassificationFactory,
@@ -124,15 +126,15 @@ def perform_active_learning(
         )
         train_acc, test_acc = _evaluate(active_learner, train[indices_labeled], test)
 
-        train_accs.append(train_accs)
+        train_accs.append(train_acc)
         test_accs.append(test_acc)
-        times_elapsed.append(times_elapsed)
+        times_elapsed.append(time_elapsed)
 
     return train_accs, test_accs, times_elapsed
 
 
 def initialize_active_learner(active_learner, y_train, initially_labeled_samples: int):
-    indices_initial = random_initialization_balanced(
+    indices_initial = random_initialization_stratified(
         y_train, n_samples=initially_labeled_samples
     )
     active_learner.initialize_data(indices_initial, y_train[indices_initial])
@@ -171,7 +173,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        choices=["20newsgroups", "ag_news", "trec6", "subj", "rotten", "imdb"],
+        choices=["ag_news", "trec6", "subj", "rotten", "imdb"],
         default="20newsgroups",
     )
     parser.add_argument(
@@ -185,6 +187,11 @@ if __name__ == "__main__":
         default="test",
     )
     args = parser.parse_args()
+
+    print(json.dumps(vars(args), indent=4))
+    exp_results_dir = Path(
+        "exp_results/" + "-".join([str(a) for a in vars(args).values()])
+    )
 
     # set random seed
     seed = args.random_seed
@@ -203,7 +210,21 @@ if __name__ == "__main__":
     )
 
     # create exp_results_dir
-    exp_results_dir = Path(f"exp_results/{args.exp_name}")
-    exp_results_dir.create()
+    exp_results_dir = Path(
+        "exp_results/" + "-".join([str(a) for a in vars(args).values()])
+    )
+    exp_results_dir.mkdir(parents=True, exist_ok=True)
+
     # save args
-    # save metrics
+    exp_results_dir_data = Path(exp_results_dir / "data.json")
+    exp_results_dir_data.write_text(
+        json.dumps(
+            {
+                "args": vars(args),
+                "train_accs": train_accs,
+                "test_accs": test_accs,
+                "times_elapsed": times_elapsed,
+            },
+            indent=4,
+        )
+    )

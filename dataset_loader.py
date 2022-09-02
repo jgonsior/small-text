@@ -6,9 +6,6 @@ from small_text.integrations.transformers.datasets import TransformersDataset
 
 def load_my_dataset(dataset: str, transformer_model_name: str):
     match dataset:
-        case "20newsgroups":
-            # nope
-            raw_dataset = datasets.load_dataset("SetFit/20_newsgroups")
         case "ag_news":
             # works
             raw_dataset = datasets.load_dataset("ag_news")
@@ -69,25 +66,3 @@ def load_my_dataset(dataset: str, transformer_model_name: str):
     )
 
     return train, test, num_classes
-
-
-def load_20newsgroups():
-    # TODO: return validation for those who need validation!
-
-    # Prepare some data: The data is a 2-class subset of 20news (baseball vs. hockey)
-    text_train, text_test = get_train_test()
-    train, test = preprocess_data(text_train, text_test)
-    num_classes = 2
-    return train, test, num_classes
-
-
-def load_subj():
-    pass
-
-
-def load_rotten():
-    pass
-
-
-def load_imdb():
-    pass
