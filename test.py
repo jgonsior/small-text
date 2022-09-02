@@ -1,6 +1,8 @@
 """Example of a binary active learning text classification.
 """
+import random
 import numpy as np
+import torch
 
 from small_text.active_learner import PoolBasedActiveLearner
 from small_text.classifiers import ConfidenceEnhancedLinearSVC
@@ -15,7 +17,7 @@ from examples.examplecode.data.example_data_binary import (
 from examples.examplecode.shared import evaluate
 
 
-def main(num_iterations=10):
+def main(num_iterations, batch_size):
     # Prepare some data: The data is a 2-class subset of 20news (baseball vs. hockey)
     text_train, text_test = get_train_test()
     train, test = preprocess_data(text_train, text_test)
@@ -32,7 +34,7 @@ def main(num_iterations=10):
 
     try:
         perform_active_learning(
-            active_learner, train, labeled_indices, test, num_iterations
+            active_learner, train, labeled_indices, test, num_iterations, batch_size
         )
     except PoolExhaustedException:
         print("Error! Not enough samples left to handle the query.")
@@ -41,7 +43,7 @@ def main(num_iterations=10):
 
 
 def perform_active_learning(
-    active_learner, train, indices_labeled, test, num_iterations
+    active_learner, train, indices_labeled, test, num_iterations, batch_size
 ):
     """
     This is the main loop in which we perform 10 iterations of active learning.
@@ -52,7 +54,7 @@ def perform_active_learning(
     # Perform 10 iterations of active learning...
     for i in range(num_iterations):
         # ...where each iteration consists of labelling 20 samples
-        indices_queried = active_learner.query(num_samples=20)
+        indices_queried = active_learner.query(num_samples=batch_size)
 
         # Simulate user interaction here. Replace this for real-world usage.
         y = train.y[indices_queried]
@@ -98,7 +100,25 @@ if __name__ == "__main__":
         default=10,
         help="number of active learning iterations",
     )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=20,
+    )
+    parser.add_argument(
+        "--random_seed",
+        type=int,
+        default=42,
+    )
 
     args = parser.parse_args()
 
-    main(num_iterations=args.num_iterations)
+    # set random seed
+    seed = args.random_seed
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
+
+    main(num_iterations=args.num_iterations, batch_size=args.batch_size)
