@@ -10,6 +10,7 @@ from small_text.classifiers import ConfidenceEnhancedLinearSVC
 from small_text.classifiers.factories import SklearnClassifierFactory
 from small_text.query_strategies import PoolExhaustedException, EmptyPoolException
 from small_text.query_strategies import RandomSampling
+from timeit import default_timer as timer
 
 
 from small_text.active_learner import PoolBasedActiveLearner
@@ -74,7 +75,7 @@ def main(
     )
 
     try:
-        perform_active_learning(
+        return perform_active_learning(
             active_learner, train, labeled_indices, test, num_iterations, batch_size
         )
     except PoolExhaustedException:
@@ -99,10 +100,16 @@ def _evaluate(active_learner, train, test):
 def perform_active_learning(
     active_learner, train, indices_labeled, test, num_iterations, batch_size
 ):
-    results = []
+    test_accs = []
+    train_accs = []
+    times_elapsed = []
 
     for i in range(num_iterations):
+        start = timer()
         indices_queried = active_learner.query(num_samples=batch_size)
+        end = timer()
+
+        time_elapsed = end - start
 
         y = train.y[indices_queried]
 
@@ -110,8 +117,18 @@ def perform_active_learning(
 
         indices_labeled = np.concatenate([indices_queried, indices_labeled])
 
-        print("Iteration #{:d} ({} samples)".format(i, len(indices_labeled)))
-        results.append(_evaluate(active_learner, train[indices_labeled], test))
+        print(
+            "Iteration #{:d} ({} samples {})".format(
+                i, len(indices_labeled), time_elapsed
+            )
+        )
+        train_acc, test_acc = _evaluate(active_learner, train[indices_labeled], test)
+
+        train_accs.append(train_accs)
+        test_accs.append(test_acc)
+        times_elapsed.append(times_elapsed)
+
+    return train_accs, test_accs, times_elapsed
 
 
 def initialize_active_learner(active_learner, y_train, initially_labeled_samples: int):
@@ -162,6 +179,11 @@ if __name__ == "__main__":
         type=str,
         default="bert-base-uncased",
     )
+    parser.add_argument(
+        "--exp_name",
+        type=str,
+        default="test",
+    )
     args = parser.parse_args()
 
     # set random seed
@@ -172,10 +194,16 @@ if __name__ == "__main__":
     np.random.seed(seed)
     random.seed(seed)
 
-    main(
+    train_accs, test_accs, times_elapsed = main(
         num_iterations=args.num_iterations,
         batch_size=args.batch_size,
         dataset=args.dataset,
         transformer_model_name=args.transformer_model_name,
         initially_labeled_samples=args.initially_labeled_samples,
     )
+
+    # create exp_results_dir
+    exp_results_dir = Path(f"exp_results/{args.exp_name}")
+    exp_results_dir.create()
+    # save args
+    # save metrics

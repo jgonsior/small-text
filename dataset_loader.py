@@ -7,17 +7,23 @@ from small_text.integrations.transformers.datasets import TransformersDataset
 def load_my_dataset(dataset: str, transformer_model_name: str):
     match dataset:
         case "20newsgroups":
+            # nope
             raw_dataset = datasets.load_dataset("SetFit/20_newsgroups")
         case "ag_news":
+            # works
             raw_dataset = datasets.load_dataset("ag_news")
         case "trec6":
+            # works
             raw_dataset = datasets.load_dataset("trec")
             raw_dataset = raw_dataset.rename_column("label-coarse", "label")
         case "subj":
+            # works
             raw_dataset = datasets.load_dataset("SetFit/subj")
         case "rotten":
+            # works
             raw_dataset = datasets.load_dataset("rotten_tomatoes")
         case "imdb":
+            # works
             raw_dataset = datasets.load_dataset("imdb")
         case _:
             print("dataset not known")
