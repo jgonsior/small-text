@@ -29,9 +29,9 @@ from small_text.query_strategies import (
     # EvidentialConfidence2,
     # BT_Temp,
     # TemperatureScaling,
-    # BreakingTies,
+    BreakingTies,
     RandomSampling,
-    # PredictionEntropy,
+    PredictionEntropy,
     # FalkenbergConfidence2,
     # FalkenbergConfidence,
     LeastConfidence,
@@ -49,6 +49,7 @@ def main(
     dataset: str,
     transformer_model_name: str,
     initially_labeled_samples: int,
+    query_strategy_name: str,
 ):
     train, test, num_classes = load_my_dataset(dataset, transformer_model_name)
 
@@ -69,8 +70,21 @@ def main(
             }
         ),
     )
-    query_strategy = LeastConfidence()
 
+    query_strategy: QueryStrategy
+
+    match query_strategy_name:
+        case "LC":
+            query_strategy = LeastConfidence()
+        case "Rand":
+            query_strategy = RandomSampling()
+        case "Ent":
+            query_strategy = PredictionEntropy()
+        case "MM":
+            query_strategy = BreakingTies()
+        case _:
+            print("Query Stategy not found")
+            exit(-1)
     active_learner = PoolBasedActiveLearner(clf_factory, query_strategy, train)
     labeled_indices = initialize_active_learner(
         active_learner, train.y, initially_labeled_samples
@@ -105,6 +119,20 @@ def perform_active_learning(
     test_accs = []
     train_accs = []
     times_elapsed = []
+    times_elapsed_model = []
+
+    # calculate passive accuracy before
+    print("Initial Performance")
+    start = timer()
+    train_acc, test_acc = _evaluate(active_learner, train[indices_labeled], test)
+    end = timer()
+
+    time_elapsed = end - start
+
+    train_accs.append(train_acc)
+    test_accs.append(test_acc)
+    times_elapsed.append(time_elapsed)
+    times_elapsed_model.append(0)
 
     for i in range(num_iterations):
         start = timer()
@@ -115,7 +143,10 @@ def perform_active_learning(
 
         y = train.y[indices_queried]
 
+        start = timer()
         active_learner.update(y)
+        end = timer()
+        time_elapsed_model = end - start
 
         indices_labeled = np.concatenate([indices_queried, indices_labeled])
 
@@ -129,8 +160,9 @@ def perform_active_learning(
         train_accs.append(train_acc)
         test_accs.append(test_acc)
         times_elapsed.append(time_elapsed)
+        times_elapsed_model.append(time_elapsed_model)
 
-    return train_accs, test_accs, times_elapsed
+    return train_accs, test_accs, times_elapsed, times_elapsed_model
 
 
 def initialize_active_learner(active_learner, y_train, initially_labeled_samples: int):
@@ -138,7 +170,7 @@ def initialize_active_learner(active_learner, y_train, initially_labeled_samples
         y_train, n_samples=initially_labeled_samples
     )
     active_learner.initialize_data(indices_initial, y_train[indices_initial])
-
+    print(indices_initial)
     return indices_initial
 
 
@@ -186,6 +218,12 @@ if __name__ == "__main__":
         type=str,
         default="test",
     )
+    parser.add_argument(
+        "--query_strategy",
+        type=str,
+        default="LC",
+        choices=["LC", "MM", "Ent", "Rand"],
+    )
     args = parser.parse_args()
 
     print(json.dumps(vars(args), indent=4))
@@ -201,12 +239,13 @@ if __name__ == "__main__":
     np.random.seed(seed)
     random.seed(seed)
 
-    train_accs, test_accs, times_elapsed = main(
+    train_accs, test_accs, times_elapsed, times_elapsed_model = main(
         num_iterations=args.num_iterations,
         batch_size=args.batch_size,
         dataset=args.dataset,
         transformer_model_name=args.transformer_model_name,
         initially_labeled_samples=args.initially_labeled_samples,
+        query_strategy_name=args.query_strategy,
     )
 
     # create exp_results_dir
@@ -223,7 +262,8 @@ if __name__ == "__main__":
                 "args": vars(args),
                 "train_accs": train_accs,
                 "test_accs": test_accs,
-                "times_elapsed": times_elapsed,
+                "times_elapsed_query_strategy": times_elapsed,
+                "times_elapsed_model": times_elapsed_model,
             },
             indent=4,
         )
