@@ -3,7 +3,7 @@ from sklearn.preprocessing import normalize
 
 from small_text.data import SklearnDataset
 
-from examplecode.data.corpus_twenty_news import get_twenty_newsgroups_corpus
+from .corpus_twenty_news import get_twenty_newsgroups_corpus
 
 
 def get_train_test():
@@ -11,7 +11,7 @@ def get_train_test():
 
 
 def preprocess_data(train, test):
-    vectorizer = TfidfVectorizer(stop_words='english')
+    vectorizer = TfidfVectorizer(stop_words="english")
 
     x_train = normalize(vectorizer.fit_transform(train.data))
     x_test = normalize(vectorizer.transform(test.data))

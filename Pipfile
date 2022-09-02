@@ -12,6 +12,9 @@ tqdm = "*"
 torch=">=1.6.0"
 torchtext=">=0.7.0"
 transformers=">=4.0.0"
+datasets = "*"
+matplotlib = "*"
+seaborn = "*"
 
 [dev-packages]
 black="*"
