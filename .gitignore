@@ -14,3 +14,5 @@ docs/_build/
 
 .active_learning_lib_cache
 .mypy_cache
+
+exp_results.bak/
