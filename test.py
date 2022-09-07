@@ -21,6 +21,7 @@ from small_text.active_learner import PoolBasedActiveLearner
 from small_text.integrations.transformers import TransformerModelArguments
 from small_text.integrations.transformers.classifiers.factories import (
     TransformerBasedClassificationFactory,
+    UncertaintyBasedClassificationFactory,
 )
 from small_text.query_strategies import (
     # DeepEnsemble,
@@ -50,6 +51,7 @@ def main(
     transformer_model_name: str,
     initially_labeled_samples: int,
     query_strategy_name: str,
+    uncertainty_method: str,
 ):
     train, test, num_classes = load_my_dataset(dataset, transformer_model_name)
 
@@ -59,9 +61,10 @@ def main(
         print("cuda available")
 
     transformer_model = TransformerModelArguments(transformer_model_name)
-    clf_factory = TransformerBasedClassificationFactory(
+    clf_factory = UncertaintyBasedClassificationFactory(
         transformer_model,
         num_classes,
+        uncertainty_method=uncertainty_method,
         kwargs=dict(
             {
                 "device": cpu_cuda,
@@ -224,12 +227,28 @@ if __name__ == "__main__":
         default="LC",
         choices=["LC", "MM", "Ent", "Rand"],
     )
+    parser.add_argument(
+        "--uncertainty_method",
+        type=str,
+        default="softmax",
+        choices=[
+            "softmax",
+            "temp_scaling",
+            "label_smoothing",
+            "MonteCarlo",
+            "inhibited",
+            "evidential1",
+            "evidential2",
+            "bayesian",
+            "ensembles",
+            "trustscore",
+            "model_calibration",
+        ],
+    )
+
     args = parser.parse_args()
 
     print(json.dumps(vars(args), indent=4))
-    exp_results_dir = Path(
-        "exp_results/" + "-".join([str(a) for a in vars(args).values()])
-    )
 
     # set random seed
     seed = args.random_seed
@@ -239,6 +258,15 @@ if __name__ == "__main__":
     np.random.seed(seed)
     random.seed(seed)
 
+    exp_results_dir = Path(
+        "exp_results/" + "-".join([str(a) for a in vars(args).values()])
+    )
+    exp_results_dir_data = Path(exp_results_dir / "data.json")
+
+    if exp_results_dir_data.exists():
+        print("Experiment has already been run, exiting!")
+        exit(0)
+
     train_accs, test_accs, times_elapsed, times_elapsed_model = main(
         num_iterations=args.num_iterations,
         batch_size=args.batch_size,
@@ -246,16 +274,13 @@ if __name__ == "__main__":
         transformer_model_name=args.transformer_model_name,
         initially_labeled_samples=args.initially_labeled_samples,
         query_strategy_name=args.query_strategy,
+        uncertainty_method=args.uncertainty_method,
     )
 
     # create exp_results_dir
-    exp_results_dir = Path(
-        "exp_results/" + "-".join([str(a) for a in vars(args).values()])
-    )
     exp_results_dir.mkdir(parents=True, exist_ok=True)
 
     # save args
-    exp_results_dir_data = Path(exp_results_dir / "data.json")
     exp_results_dir_data.write_text(
         json.dumps(
             {

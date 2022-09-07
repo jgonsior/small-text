@@ -1,43 +1,20 @@
-from classification import TransformerBasedClassification
 import abc
 
-from sklearn.preprocessing import MultiLabelBinarizer
-
-from small_text.classifiers.classification import EmbeddingMixin
 from small_text.integrations.pytorch.exceptions import PytorchNotFoundError
-from small_text.utils.classification import empty_result, get_splits
-from small_text.utils.context import build_pbar_context
-from small_text.utils.data import check_training_data, list_length
-from small_text.utils.datetime import format_timedelta
-from small_text.utils.labels import csr_to_list, get_num_labels
-from small_text.utils.logging import verbosity_logger, VERBOSITY_MORE_VERBOSE
-from small_text.utils.system import get_tmp_dir_base
+from small_text.integrations.transformers.classifiers.classification import (
+    TransformerBasedClassification,
+)
+from small_text.utils.classification import empty_result
+
+import numpy as np
+
+from functools import partial
+
 
 try:
     import torch
     import torch.nn.functional as F  # noqa: N812
-
-    from torch.optim import AdamW
-    from transformers import logging as transformers_logging
-    from transformers import (
-        AutoConfig,
-        AutoModelForSequenceClassification,
-        AutoTokenizer,
-    )
-
-    from small_text.integrations.pytorch.classifiers.base import (
-        check_optimizer_and_scheduler_config,
-        PytorchClassifier,
-    )
-    from small_text.integrations.pytorch.model_selection import (
-        Metric,
-        PytorchModelSelection,
-    )
     from small_text.integrations.pytorch.utils.data import dataloader
-    from small_text.integrations.pytorch.utils.misc import (
-        early_stopping_deprecation_warning,
-    )
-    from small_text.integrations.transformers.datasets import TransformersDataset
 except ImportError:
     raise PytorchNotFoundError("Could not import pytorch")
 
