@@ -8,21 +8,21 @@ from small_text.integrations.pytorch.exceptions import PytorchNotFoundError
 from small_text.training.early_stopping import (
     EarlyStopping,
     NoopEarlyStopping,
-    SequentialEarlyStopping
+    SequentialEarlyStopping,
 )
 
 try:
     import torch
     import torch.nn.functional as F  # noqa: N812
 
-    from torch.nn.modules import CrossEntropyLoss, BCEWithLogitsLoss
+    from torch.nn.modules import CrossEntropyLoss, BCEWithLogitsLoss, KLDivLoss
     from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 
     from small_text.integrations.pytorch.utils.data import get_class_weights
     from small_text.utils.classification import empty_result, prediction_result
     from small_text.integrations.pytorch.utils.loss import LossAdapter2DTo1D
 except ImportError:
-    raise PytorchNotFoundError('Could not import pytorch')
+    raise PytorchNotFoundError("Could not import pytorch")
 
 
 logger = logging.getLogger(__name__)
@@ -30,26 +30,30 @@ logger = logging.getLogger(__name__)
 
 def check_optimizer_and_scheduler_config(optimizer, scheduler):
     if scheduler is not None and optimizer is None:
-        raise ValueError('You must also pass an optimizer if you pass a scheduler to fit()')
+        raise ValueError(
+            "You must also pass an optimizer if you pass a scheduler to fit()"
+        )
 
 
 class PytorchClassifier(Classifier):
-
     def __init__(self, multi_label=False, device=None, mini_batch_size=32):
 
         self.multi_label = multi_label
         self.mini_batch_size = mini_batch_size
 
         if device is None:
-            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
             self.device = device
 
-        if self.device.startswith('cuda'):
-            logging.info('torch.version.cuda: %s', torch.version.cuda)
-            logging.info('torch.cuda.is_available(): %s', torch.cuda.is_available())
+        if self.device.startswith("cuda"):
+            logging.info("torch.version.cuda: %s", torch.version.cuda)
+            logging.info("torch.cuda.is_available(): %s", torch.cuda.is_available())
             if torch.cuda.is_available():
-                logging.info('torch.cuda.current_device(): %s', torch.cuda.current_device())
+                logging.info(
+                    "torch.cuda.current_device(): %s", torch.cuda.current_device()
+                )
+                logging.info("torch.device_count(): %s", torch.cuda.device_count())
 
     @abstractmethod
     def fit(self, train_set, validation_set=None, weights=None, **kwargs):
@@ -73,11 +77,17 @@ class PytorchClassifier(Classifier):
             List of probabilities (or confidence estimates) if `return_proba` is True.
         """
         if len(data_set) == 0:
-            return empty_result(self.multi_label, self.num_classes, return_prediction=True,
-                                return_proba=return_proba)
+            return empty_result(
+                self.multi_label,
+                self.num_classes,
+                return_prediction=True,
+                return_proba=return_proba,
+            )
 
         proba = self.predict_proba(data_set)
-        predictions = prediction_result(proba, self.multi_label, self.num_classes, enc=self.enc_)
+        predictions = prediction_result(
+            proba, self.multi_label, self.num_classes, enc=self.enc_
+        )
 
         if return_proba:
             return predictions, proba
@@ -101,7 +111,7 @@ class PytorchClassifier(Classifier):
 
     def _get_default_criterion(self, class_weights, use_sample_weights=False):
 
-        reduction = 'none' if use_sample_weights else 'mean'
+        reduction = "none" if use_sample_weights else "mean"
         if self.multi_label or self.num_classes == 2:
             loss = BCEWithLogitsLoss(pos_weight=class_weights, reduction=reduction)
             if use_sample_weights:
@@ -110,85 +120,104 @@ class PytorchClassifier(Classifier):
         else:
             return CrossEntropyLoss(weight=class_weights, reduction=reduction)
 
-    def _get_default_early_stopping(self, early_stopping, early_stopping_no_improvement,
-                                    early_stopping_acc, validations_per_epoch,
-                                    kwarg_no_improvement_name='early_stopping_no_improvement'):
+    def _get_default_early_stopping(
+        self,
+        early_stopping,
+        early_stopping_no_improvement,
+        early_stopping_acc,
+        validations_per_epoch,
+        kwarg_no_improvement_name="early_stopping_no_improvement",
+    ):
         # TODO:
         if early_stopping is None:
             patience = early_stopping_no_improvement * validations_per_epoch
             if early_stopping_no_improvement == 5 and early_stopping_acc == -1:
-                early_stopping = EarlyStopping('val_loss', patience=patience)
+                early_stopping = EarlyStopping("val_loss", patience=patience)
             elif early_stopping_no_improvement == 0 and early_stopping_acc == -1:
                 early_stopping = NoopEarlyStopping()
             else:
-                early_stopping = SequentialEarlyStopping([
-                    EarlyStopping('val_loss', patience=patience),
-                    # TODO: disable patience here?
-                    EarlyStopping('train_acc', patience=patience, threshold=early_stopping_acc)
-                ])
-        elif early_stopping == 'none':
+                early_stopping = SequentialEarlyStopping(
+                    [
+                        EarlyStopping("val_loss", patience=patience),
+                        # TODO: disable patience here?
+                        EarlyStopping(
+                            "train_acc", patience=patience, threshold=early_stopping_acc
+                        ),
+                    ]
+                )
+        elif early_stopping == "none":
             early_stopping = NoopEarlyStopping()
         else:
             if early_stopping_no_improvement != 5 or early_stopping_acc != -1:
-                warnings.warn(f'Both the fit() argument early_stopping and the __init__() '
-                              f'arguments "{kwarg_no_improvement_name}" / "early_stopping_acc" '
-                              f'have been used. In this case the fit() argument takes precedence. '
-                              f'The __init__() arguments are deprecated, so please use the '
-                              f'early stopping argument in fit() instead.',
-                              UserWarning)
+                warnings.warn(
+                    f"Both the fit() argument early_stopping and the __init__() "
+                    f'arguments "{kwarg_no_improvement_name}" / "early_stopping_acc" '
+                    f"have been used. In this case the fit() argument takes precedence. "
+                    f"The __init__() arguments are deprecated, so please use the "
+                    f"early stopping argument in fit() instead.",
+                    UserWarning,
+                )
         return early_stopping
 
     def _get_optimizer_and_scheduler(self, optimizer, scheduler, num_epochs, sub_train):
 
         if optimizer is None or scheduler is None:
 
-            optimizer, scheduler = self._initialize_optimizer_and_scheduler(optimizer,
-                                                                            scheduler,
-                                                                            num_epochs,
-                                                                            sub_train,
-                                                                            self.lr)
+            optimizer, scheduler = self._initialize_optimizer_and_scheduler(
+                optimizer, scheduler, num_epochs, sub_train, self.lr
+            )
         return optimizer, scheduler
 
-    def _initialize_optimizer_and_scheduler(self, optimizer, scheduler, num_epochs,
-                                            sub_train, base_lr):
+    def _initialize_optimizer_and_scheduler(
+        self, optimizer, scheduler, num_epochs, sub_train, base_lr
+    ):
 
-        steps = (len(sub_train) // self.mini_batch_size) \
-                + int(len(sub_train) % self.mini_batch_size != 0)
+        steps = (len(sub_train) // self.mini_batch_size) + int(
+            len(sub_train) % self.mini_batch_size != 0
+        )
 
         if optimizer is None:
-            params, optimizer = self._default_optimizer(base_lr) \
-                if optimizer is None else optimizer
+            params, optimizer = (
+                self._default_optimizer(base_lr) if optimizer is None else optimizer
+            )
 
-        if scheduler == 'linear':
+        if scheduler == "linear":
             try:
                 from transformers import get_linear_schedule_with_warmup
-                scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                            num_warmup_steps=0,
-                                                            num_training_steps=steps*num_epochs)
+
+                scheduler = get_linear_schedule_with_warmup(
+                    optimizer, num_warmup_steps=0, num_training_steps=steps * num_epochs
+                )
             except ImportError:
-                raise ValueError('Linear scheduler is only available when the transformers '
-                                 'integration is installed ')
+                raise ValueError(
+                    "Linear scheduler is only available when the transformers "
+                    "integration is installed "
+                )
 
         elif scheduler is None:
             # constant learning rate
             scheduler = LambdaLR(optimizer, lambda _: 1)
         elif not isinstance(scheduler, _LRScheduler):
-            raise ValueError(f'Invalid scheduler: {scheduler}')
+            raise ValueError(f"Invalid scheduler: {scheduler}")
 
         return optimizer, scheduler
 
     def initialize_class_weights(self, sub_train):
-        if self.class_weight == 'balanced':
+        if self.class_weight == "balanced":
             if self.multi_label:
-                warnings.warn('Setting class_weight to \'balanced\' is intended for the '
-                              'single-label use case and might not have a beneficial '
-                              'effect for multi-label classification')
+                warnings.warn(
+                    "Setting class_weight to 'balanced' is intended for the "
+                    "single-label use case and might not have a beneficial "
+                    "effect for multi-label classification"
+                )
             class_weights_ = get_class_weights(sub_train.y, self.num_classes)
             class_weights_ = class_weights_.to(self.device)
         elif self.class_weight is None:
             class_weights_ = None
         else:
-            raise ValueError(f'Invalid value for class_weight kwarg: {self.class_weight}')
+            raise ValueError(
+                f"Invalid value for class_weight kwarg: {self.class_weight}"
+            )
 
         return class_weights_
 

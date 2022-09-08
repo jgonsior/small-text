@@ -59,6 +59,48 @@ class SoftmaxUncertaintyClassifier(UncertaintyBaseClass):
 # .local/lib/python3.8/site-packages/small_text/integrations/transformers/classifiers/classification.py
 #  Implementation for Calibration - Temperature Scaling: https://github.com/shreydesai/calibration/blob/master/calibrate.py
 class TemperatureScalingUncertaintyClassifier(UncertaintyBaseClass):
+    def __init__(
+        self,
+        transformer_model,
+        num_classes,
+        multi_label=False,
+        num_epochs=10,
+        lr=0.00002,
+        mini_batch_size=12,
+        validation_set_size=0.1,
+        validations_per_epoch=1,
+        early_stopping_no_improvement=5,
+        early_stopping_acc=-1,
+        model_selection=True,
+        fine_tuning_arguments=None,
+        device=None,
+        memory_fix=1,
+        class_weight=None,
+        verbosity=...,
+        cache_dir=".active_learning_lib_cache/",
+    ):
+        super().__init__(
+            transformer_model,
+            num_classes,
+            multi_label,
+            num_epochs,
+            lr,
+            mini_batch_size,
+            validation_set_size,
+            validations_per_epoch,
+            early_stopping_no_improvement,
+            early_stopping_acc,
+            model_selection,
+            fine_tuning_arguments,
+            device,
+            memory_fix,
+            class_weight,
+            verbosity,
+            cache_dir,
+        )
+
+        self.temperature = torch.nn.ParameterDict(torch.ones(1) * 1.5)
+
     def _compute_loss(self, cls, outputs, epoch, validate=False):
         if self.num_classes == 2:
             logits = outputs.logits

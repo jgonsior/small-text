@@ -469,7 +469,7 @@ class TransformerBasedClassification(TransformerBasedEmbeddingMixin, PytorchClas
             optimizer, scheduler, self.num_epochs, sub_train
         )
         # self.model = self.model.to(self.device)
-        self.model = torch.nn.DataParallel(self.model)
+        # self.model = torch.nn.DataParallel(self.model)
         self.model.to(self.device)
 
         with tempfile.TemporaryDirectory(dir=get_tmp_dir_base()) as tmp_dir:
@@ -492,6 +492,7 @@ class TransformerBasedClassification(TransformerBasedEmbeddingMixin, PytorchClas
             self.transformer_model.config,
             num_labels=self.num_classes,
             cache_dir=cache_dir,
+            output_hidden_states=True,  # silvio
         )
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.transformer_model.tokenizer,

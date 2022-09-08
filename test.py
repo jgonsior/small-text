@@ -6,6 +6,7 @@ import random
 import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
+import logging
 
 from small_text.active_learner import PoolBasedActiveLearner
 from small_text.classifiers import ConfidenceEnhancedLinearSVC
@@ -20,7 +21,6 @@ from small_text.active_learner import PoolBasedActiveLearner
 
 from small_text.integrations.transformers import TransformerModelArguments
 from small_text.integrations.transformers.classifiers.factories import (
-    TransformerBasedClassificationFactory,
     UncertaintyBasedClassificationFactory,
 )
 from small_text.query_strategies import (
@@ -179,6 +179,9 @@ def initialize_active_learner(active_learner, y_train, initially_labeled_samples
 
 if __name__ == "__main__":
     import argparse
+
+    logger = logging.getLogger()
+    logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser(
         description="An example that shows active learning "
