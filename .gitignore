@@ -16,3 +16,4 @@ docs/_build/
 .mypy_cache
 
 exp_results.bak/
+btw_silvio_small_text_local_lib/
