@@ -22,23 +22,3 @@ Upon request, we can also provide you access to the raw experiment results (~20G
 
 The underlying [small-text](https://github.com/webis-de/small-text) framework is a software created by Christopher Schröder ([@chschroeder](https://github.com/chschroeder)) at Leipzig University's [NLP group](http://asv.informatik.uni-leipzig.de/) 
 which is a part of the [Webis](https://webis.de/) research network. 
-
-## Citation
-
-A preprint which introduces small-text is available here:  
-[Small-text: Active Learning for Text Classification in Python](https://arxiv.org/abs/2107.10314). 
-
-```
-@misc{schroeder2021smalltext,
-    title={Small-Text: Active Learning for Text Classification in Python}, 
-    author={Christopher Schröder and Lydia Müller and Andreas Niekler and Martin Potthast},
-    year={2021},
-    eprint={2107.10314},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG}
-}
-```
-
-## License
-
-[MIT License](LICENSE)
